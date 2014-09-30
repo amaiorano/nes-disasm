@@ -25,9 +25,9 @@ static_assert(sizeof(int32)==4, "Invalid type size");
 template <typename N> struct CTPrintSize;
 
 template <int MaxLength = 1024>
-struct FormatString
+struct FormattedString
 {
-	FormatString(const char* format, ...)
+	FormattedString(const char* format, ...)
 	{
 		va_list args;
 		va_start(args, format);
@@ -57,7 +57,7 @@ public:
 	FileStream(const char* name, const char* mode) : m_pFile(nullptr)
 	{
 		if (!Open(name, mode))
-			throw std::exception(FormatString<>("Failed to open file: %s", name));
+			throw std::exception(FormattedString<>("Failed to open file: %s", name));
 	}
 
 	bool Open(const char* name, const char* mode)
@@ -174,247 +174,290 @@ struct RomHeader
 };
 static_assert(sizeof(RomHeader)==16, "RomHeader must be 16 bytes");
 
-enum eAddressMode
+namespace AddressMode
 {
-	Immedt,	// Immediate : #value
-	Implid,	// Implied : no operand
-	Accumu,	// Accumulator : no operand
-	Relatv, // Relative : $addr8 used with branch instructions
-	ZeroPg,	// Zero Page : $addr8
-	ZPIdxX,	// Zero Page Indexed with X : $addr8 + X
-	ZPIdxY, // Zero Page Indexed with Y : $addr8 + Y
-	Absolu, // Absolute : $addr16
-	AbIdxX, // Absolute Indexed with X : $addr16 + X
-	AbIdxY, // Absolute Indexed with Y : $addr16 + Y
-	Indrct, // Indirect : ($addr8) used only with JMP
-	IdxInd, // Indexed with X Indirect : ($addr8 + X)
-	IndIdx, // Indirect Indexed with Y : ($addr8) + Y
-};
+	enum Type
+	{
+		Immedt,	// Immediate : #value
+		Implid,	// Implied : no operand
+		Accumu,	// Accumulator : no operand
+		Relatv, // Relative : $addr8 used with branch instructions
+		ZeroPg,	// Zero Page : $addr8
+		ZPIdxX,	// Zero Page Indexed with X : $addr8 + X
+		ZPIdxY, // Zero Page Indexed with Y : $addr8 + Y
+		Absolu, // Absolute : $addr16
+		AbIdxX, // Absolute Indexed with X : $addr16 + X
+		AbIdxY, // Absolute Indexed with Y : $addr16 + Y
+		Indrct, // Indirect : ($addr8) used only with JMP
+		IdxInd, // Indexed with X Indirect : ($addr8 + X)
+		IndIdx, // Indirect Indexed with Y : ($addr8) + Y
+	};
+}
+
+namespace OpCodeName
+{
+	enum Type
+	{
+		ADC, AND, ASL,
+		BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS,
+		CLC, CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY,
+		EOR, INC, INX, INY,
+		JMP, JSR,
+		LDA, LDX, LDY, LSR,
+		NOP,
+		ORA,
+		PHA, PHP, PLA, PLP,
+		ROL, ROR, RTI, RTS,
+		SBC, SEC, SED, SEI, STA, STX, STY,
+		TAX, TAY, TSX, TXA, TXS, TYA,
+
+		NumTypes
+	};
+
+	static const char* String[] =
+	{
+		"ADC", "AND", "ASL",
+		"BCC", "BCS", "BEQ", "BIT", "BMI", "BNE", "BPL", "BRK", "BVC", "BVS",
+		"CLC", "CLD", "CLI", "CLV", "CMP", "CPX", "CPY", "DEC", "DEX", "DEY",
+		"EOR", "INC", "INX", "INY",
+		"JMP", "JSR",
+		"LDA", "LDX", "LDY", "LSR",
+		"NOP",
+		"ORA",
+		"PHA", "PHP", "PLA", "PLP",
+		"ROL", "ROR", "RTI", "RTS",
+		"SBC", "SEC", "SED", "SEI", "STA", "STX", "STY",
+		"TAX", "TAY", "TSX", "TXA", "TXS", "TYA",
+	};
+
+	static_assert(NumTypes == ARRAYSIZE(String), "Size mismatch");
+}
+
 
 struct OpCodeEntry
 {
 	uint8 opCode;
 	uint8 numBytes;
 	uint8 numCycles;
-	eAddressMode addrMode;
-	const char* formatString;
+	AddressMode::Type addrMode;
+	OpCodeName::Type opCodeName;
 };
 
 void ValidateOpCodeTable(OpCodeEntry opCodeTable[], size_t numEntries);
 
-#define ADDR_8 "$%02X"
-#define ADDR_16 "$%04X"
-
 OpCodeEntry** GetOpCodeTable()
 {
+	using namespace OpCodeName;
+	using namespace AddressMode;
+
 	static OpCodeEntry opCodeTable[] =
 	{
-		{ 0x69, 2, 2, Immedt, "ADC #"ADDR_8 },
-		{ 0x65, 2, 3, ZeroPg, "ADC "ADDR_8 },
-		{ 0x75, 2, 4, ZPIdxX, "ADC "ADDR_8",X" },
-		{ 0x6D, 3, 4, Absolu, "ADC "ADDR_16 },
-		{ 0x7D, 3, 4, AbIdxX, "ADC "ADDR_16",X" },
-		{ 0x79, 3, 4, AbIdxY, "ADC "ADDR_16",Y" },
-		{ 0x61, 2, 6, IdxInd, "ADC ("ADDR_8",X)" },
-		{ 0x71, 2, 5, IndIdx, "ADC ("ADDR_8"),Y" },
+		{ 0x69, 2, 2, Immedt, ADC },
+		{ 0x65, 2, 3, ZeroPg, ADC },
+		{ 0x75, 2, 4, ZPIdxX, ADC },
+		{ 0x6D, 3, 4, Absolu, ADC },
+		{ 0x7D, 3, 4, AbIdxX, ADC },
+		{ 0x79, 3, 4, AbIdxY, ADC },
+		{ 0x61, 2, 6, IdxInd, ADC },
+		{ 0x71, 2, 5, IndIdx, ADC },
 
-		{ 0x29, 2, 2, Immedt, "AND #"ADDR_8 },
-		{ 0x25, 2, 3, ZeroPg, "AND "ADDR_8 },
-		{ 0x35, 2, 4, ZPIdxX, "AND "ADDR_8",X" },
-		{ 0x2D, 3, 4, Absolu, "AND "ADDR_16 },
-		{ 0x3D, 3, 4, AbIdxX, "AND "ADDR_16",X" },
-		{ 0x39, 3, 4, AbIdxY, "AND "ADDR_16",Y" },
-		{ 0x21, 2, 6, IdxInd, "AND ("ADDR_8",X)" },
-		{ 0x31, 2, 5, IndIdx, "AND ("ADDR_8"),Y" },
+		{ 0x29, 2, 2, Immedt, AND },
+		{ 0x25, 2, 3, ZeroPg, AND },
+		{ 0x35, 2, 4, ZPIdxX, AND },
+		{ 0x2D, 3, 4, Absolu, AND },
+		{ 0x3D, 3, 4, AbIdxX, AND },
+		{ 0x39, 3, 4, AbIdxY, AND },
+		{ 0x21, 2, 6, IdxInd, AND },
+		{ 0x31, 2, 5, IndIdx, AND },
 
-		{ 0x0A, 1, 2, Accumu, "ASL A" },
-		{ 0x06, 2, 5, ZeroPg, "ASL "ADDR_8 },
-		{ 0x16, 2, 6, ZPIdxX, "ASL "ADDR_8",X" },
-		{ 0x0E, 3, 6, Absolu, "ASL "ADDR_16 },
-		{ 0x1E, 3, 7, AbIdxX, "ASL "ADDR_16",X" },
+		{ 0x0A, 1, 2, Accumu, ASL },
+		{ 0x06, 2, 5, ZeroPg, ASL },
+		{ 0x16, 2, 6, ZPIdxX, ASL },
+		{ 0x0E, 3, 6, Absolu, ASL },
+		{ 0x1E, 3, 7, AbIdxX, ASL },
 
-		{ 0x90, 2, 2, Relatv, "BCC "ADDR_8 },
+		{ 0x90, 2, 2, Relatv, BCC },
 		
-		{ 0xB0, 2, 2, Relatv, "BCS "ADDR_8 },
+		{ 0xB0, 2, 2, Relatv, BCS },
 		
-		{ 0xF0, 2, 2, Relatv, "BEQ "ADDR_8 },
+		{ 0xF0, 2, 2, Relatv, BEQ },
 
-		{ 0x24, 2, 3, ZeroPg, "BIT "ADDR_8 },
-		{ 0x2C, 3, 4, Absolu, "BIT "ADDR_16 },
+		{ 0x24, 2, 3, ZeroPg, BIT },
+		{ 0x2C, 3, 4, Absolu, BIT },
 
-		{ 0x30, 2, 2, Relatv, "BMI "ADDR_8 },
+		{ 0x30, 2, 2, Relatv, BMI },
 
-		{ 0xD0, 2, 2, Relatv, "BNE "ADDR_8 },
+		{ 0xD0, 2, 2, Relatv, BNE },
 
-		{ 0x10, 2, 2, Relatv, "BPL "ADDR_8 },
+		{ 0x10, 2, 2, Relatv, BPL },
 
-		{ 0x00, 1, 7, Implid, "BRK" },
+		{ 0x00, 1, 7, Implid, BRK },
 
-		{ 0x50, 2, 2, Relatv, "BVC "ADDR_8 },
+		{ 0x50, 2, 2, Relatv, BVC },
 
-		{ 0x70, 2, 2, Relatv, "BVS "ADDR_8 },
+		{ 0x70, 2, 2, Relatv, BVS },
 
-		{ 0x18, 1, 2, Implid, "CLC" },
+		{ 0x18, 1, 2, Implid, CLC },
 
-		{ 0xD8, 1, 2, Implid, "CLD" },
+		{ 0xD8, 1, 2, Implid, CLD },
 
-		{ 0x58, 1, 2, Implid, "CLI" },
+		{ 0x58, 1, 2, Implid, CLI },
 
-		{ 0xB8, 1, 2, Implid, "CLV" },
+		{ 0xB8, 1, 2, Implid, CLV },
 
-		{ 0xC9, 2, 2, Immedt, "CMP #"ADDR_8 },
-		{ 0xC5, 2, 3, ZeroPg, "CMP "ADDR_8 },
-		{ 0xD5, 2, 4, ZPIdxX, "CMP "ADDR_8",X" },
-		{ 0xCD, 3, 4, Absolu, "CMP "ADDR_16 },
-		{ 0xDD, 3, 4, AbIdxX, "CMP "ADDR_16",X" },
-		{ 0xD9, 3, 4, AbIdxY, "CMP "ADDR_16",Y" },
-		{ 0xC1, 2, 6, IdxInd, "CMP ("ADDR_8",X)" },
-		{ 0xD1, 2, 5, IndIdx, "CMP ("ADDR_8"),Y" },
+		{ 0xC9, 2, 2, Immedt, CMP },
+		{ 0xC5, 2, 3, ZeroPg, CMP },
+		{ 0xD5, 2, 4, ZPIdxX, CMP },
+		{ 0xCD, 3, 4, Absolu, CMP },
+		{ 0xDD, 3, 4, AbIdxX, CMP },
+		{ 0xD9, 3, 4, AbIdxY, CMP },
+		{ 0xC1, 2, 6, IdxInd, CMP },
+		{ 0xD1, 2, 5, IndIdx, CMP },
 
-		{ 0xE0, 2, 2, Immedt, "CPX #"ADDR_8 },
-		{ 0xE4, 2, 3, ZeroPg, "CPX "ADDR_8 },
-		{ 0xEC, 3, 4, Absolu, "CPX "ADDR_16 },
+		{ 0xE0, 2, 2, Immedt, CPX },
+		{ 0xE4, 2, 3, ZeroPg, CPX },
+		{ 0xEC, 3, 4, Absolu, CPX },
 
-		{ 0xC0, 2, 2, Immedt, "CPY #"ADDR_8 },
-		{ 0xC4, 2, 3, ZeroPg, "CPY "ADDR_8 },
-		{ 0xCC, 3, 4, Absolu, "CPY "ADDR_16 },
+		{ 0xC0, 2, 2, Immedt, CPY },
+		{ 0xC4, 2, 3, ZeroPg, CPY },
+		{ 0xCC, 3, 4, Absolu, CPY },
 
-		{ 0xC6, 2, 5, ZeroPg, "DEC "ADDR_8 },
-		{ 0xD6, 2, 6, ZPIdxX, "DEC "ADDR_8",X" },
-		{ 0xCE, 3, 6, Absolu, "DEC "ADDR_16 },
-		{ 0xDE, 3, 7, AbIdxX, "DEC "ADDR_16",X" },
+		{ 0xC6, 2, 5, ZeroPg, DEC },
+		{ 0xD6, 2, 6, ZPIdxX, DEC },
+		{ 0xCE, 3, 6, Absolu, DEC },
+		{ 0xDE, 3, 7, AbIdxX, DEC },
 
-		{ 0xCA, 1, 2, Implid, "DEX" },
+		{ 0xCA, 1, 2, Implid, DEX },
 
-		{ 0x88, 1, 2, Implid, "DEY" },
+		{ 0x88, 1, 2, Implid, DEY },
 
-		{ 0x49, 2, 2, Immedt, "EOR #"ADDR_8 },
-		{ 0x45, 2, 3, ZeroPg, "EOR "ADDR_8 },
-		{ 0x55, 2, 4, ZPIdxX, "EOR "ADDR_8",X" },
-		{ 0x4D, 3, 4, Absolu, "EOR "ADDR_16 },
-		{ 0x5D, 3, 4, AbIdxX, "EOR "ADDR_16",X" },
-		{ 0x59, 3, 4, AbIdxY, "EOR "ADDR_16",Y" },
-		{ 0x41, 2, 6, IdxInd, "EOR ("ADDR_8",X)" },
-		{ 0x51, 2, 5, IndIdx, "EOR ("ADDR_8"),Y" },
+		{ 0x49, 2, 2, Immedt, EOR },
+		{ 0x45, 2, 3, ZeroPg, EOR },
+		{ 0x55, 2, 4, ZPIdxX, EOR },
+		{ 0x4D, 3, 4, Absolu, EOR },
+		{ 0x5D, 3, 4, AbIdxX, EOR },
+		{ 0x59, 3, 4, AbIdxY, EOR },
+		{ 0x41, 2, 6, IdxInd, EOR },
+		{ 0x51, 2, 5, IndIdx, EOR },
 
-		{ 0xE6, 2, 5, ZeroPg, "INC "ADDR_8 },
-		{ 0xF6, 2, 6, ZPIdxX, "INC "ADDR_8",X" },
-		{ 0xEE, 3, 6, Absolu, "INC "ADDR_16 },
-		{ 0xFE, 3, 7, AbIdxX, "INC "ADDR_16",X" },
+		{ 0xE6, 2, 5, ZeroPg, INC },
+		{ 0xF6, 2, 6, ZPIdxX, INC },
+		{ 0xEE, 3, 6, Absolu, INC },
+		{ 0xFE, 3, 7, AbIdxX, INC },
 
-		{ 0xE8, 1, 2, Implid, "INX" },
+		{ 0xE8, 1, 2, Implid, INX },
 
-		{ 0xC8, 1, 2, Implid, "INY" },
+		{ 0xC8, 1, 2, Implid, INY },
 
-		{ 0x4C, 3, 3, Absolu, "JMP "ADDR_16 },
-		{ 0x6C, 3, 5, Indrct, "JMP ("ADDR_16")" },
+		{ 0x4C, 3, 3, Absolu, JMP },
+		{ 0x6C, 3, 5, Indrct, JMP },
 
-		{ 0x20, 3, 6, Absolu, "JSR "ADDR_16 },
+		{ 0x20, 3, 6, Absolu, JSR },
 
-		{ 0xA9, 2, 2, Immedt, "LDA #"ADDR_8 },
-		{ 0xA5, 2, 3, ZeroPg, "LDA "ADDR_8 },
-		{ 0xB5, 2, 4, ZPIdxX, "LDA "ADDR_8",X" },
-		{ 0xAD, 3, 4, Absolu, "LDA "ADDR_16 },
-		{ 0xBD, 3, 4, AbIdxX, "LDA "ADDR_16",X" },
-		{ 0xB9, 3, 4, AbIdxY, "LDA "ADDR_16",Y" },
-		{ 0xA1, 2, 6, IdxInd, "LDA ("ADDR_8",X)" },
-		{ 0xB1, 2, 5, IndIdx, "LDA ("ADDR_8"),Y" },
+		{ 0xA9, 2, 2, Immedt, LDA },
+		{ 0xA5, 2, 3, ZeroPg, LDA },
+		{ 0xB5, 2, 4, ZPIdxX, LDA },
+		{ 0xAD, 3, 4, Absolu, LDA },
+		{ 0xBD, 3, 4, AbIdxX, LDA },
+		{ 0xB9, 3, 4, AbIdxY, LDA },
+		{ 0xA1, 2, 6, IdxInd, LDA },
+		{ 0xB1, 2, 5, IndIdx, LDA },
 
-		{ 0xA2, 2, 2, Immedt, "LDX #"ADDR_8 },
-		{ 0xA6, 2, 3, ZeroPg, "LDX "ADDR_8 },
-		{ 0xB6, 2, 4, ZPIdxY,  "LDX "ADDR_8",Y" },
-		{ 0xAE, 3, 4, Absolu, "LDX "ADDR_16 },
-		{ 0xBE, 3, 4, AbIdxY, "LDX "ADDR_16",Y" },
+		{ 0xA2, 2, 2, Immedt, LDX },
+		{ 0xA6, 2, 3, ZeroPg, LDX },
+		{ 0xB6, 2, 4, ZPIdxY, LDX },
+		{ 0xAE, 3, 4, Absolu, LDX },
+		{ 0xBE, 3, 4, AbIdxY, LDX },
 
-		{ 0xA0, 2, 2, Immedt, "LDY #"ADDR_8 },
-		{ 0xA4, 2, 3, ZeroPg, "LDY "ADDR_8 },
-		{ 0xB4, 2, 4, ZPIdxX, "LDY "ADDR_8",X" },
-		{ 0xAC, 3, 4, Absolu, "LDY "ADDR_16 },
-		{ 0xBC, 3, 4, AbIdxX, "LDY "ADDR_16",X" },
+		{ 0xA0, 2, 2, Immedt, LDY },
+		{ 0xA4, 2, 3, ZeroPg, LDY },
+		{ 0xB4, 2, 4, ZPIdxX, LDY },
+		{ 0xAC, 3, 4, Absolu, LDY },
+		{ 0xBC, 3, 4, AbIdxX, LDY },
 
-		{ 0x4A, 1, 2, Accumu, "LSR A" },
-		{ 0x46, 2, 5, ZeroPg, "LSR "ADDR_8 },
-		{ 0x56, 2, 6, ZPIdxX, "LSR "ADDR_8",X" },
-		{ 0x4E, 3, 6, Absolu, "LSR "ADDR_16 },
-		{ 0x5E, 3, 7, AbIdxX, "LSR "ADDR_16",X" },
+		{ 0x4A, 1, 2, Accumu, LSR },
+		{ 0x46, 2, 5, ZeroPg, LSR },
+		{ 0x56, 2, 6, ZPIdxX, LSR },
+		{ 0x4E, 3, 6, Absolu, LSR },
+		{ 0x5E, 3, 7, AbIdxX, LSR },
 
-		{ 0xEA, 1, 2, Implid, "NOP" },
+		{ 0xEA, 1, 2, Implid, NOP },
 
-		{ 0x09, 2, 2, Immedt, "ORA #"ADDR_8 },
-		{ 0x05, 2, 3, ZeroPg, "ORA "ADDR_8 },
-		{ 0x15, 2, 4, ZPIdxX, "ORA "ADDR_8",X" },
-		{ 0x0D, 3, 4, Absolu, "ORA "ADDR_16 },
-		{ 0x1D, 3, 4, AbIdxX, "ORA "ADDR_16",X" },
-		{ 0x19, 3, 4, AbIdxY, "ORA "ADDR_16",Y" },
-		{ 0x01, 2, 6, IdxInd, "ORA ("ADDR_8",X)" },
-		{ 0x11, 2, 5, IndIdx, "ORA ("ADDR_8"),Y" },
+		{ 0x09, 2, 2, Immedt, ORA },
+		{ 0x05, 2, 3, ZeroPg, ORA },
+		{ 0x15, 2, 4, ZPIdxX, ORA },
+		{ 0x0D, 3, 4, Absolu, ORA },
+		{ 0x1D, 3, 4, AbIdxX, ORA },
+		{ 0x19, 3, 4, AbIdxY, ORA },
+		{ 0x01, 2, 6, IdxInd, ORA },
+		{ 0x11, 2, 5, IndIdx, ORA },
 
-		{ 0x48, 1, 3, Implid, "PHA" },
+		{ 0x48, 1, 3, Implid, PHA },
 
-		{ 0x08, 1, 3, Implid, "PHP" },
+		{ 0x08, 1, 3, Implid, PHP },
 
-		{ 0x68, 1, 4, Implid, "PLA" },
+		{ 0x68, 1, 4, Implid, PLA },
 
-		{ 0x28, 1, 4, Implid, "PLP" },
+		{ 0x28, 1, 4, Implid, PLP },
 
-		{ 0x2A, 1, 2, Accumu, "ROL A" },
-		{ 0x26, 2, 5, ZeroPg, "ROL "ADDR_8 },
-		{ 0x36, 2, 6, ZPIdxX, "ROL "ADDR_8",X" },
-		{ 0x2E, 3, 6, Absolu, "ROL "ADDR_16 },
-		{ 0x3E, 3, 7, AbIdxX, "ROL "ADDR_16",X" },
+		{ 0x2A, 1, 2, Accumu, ROL },
+		{ 0x26, 2, 5, ZeroPg, ROL },
+		{ 0x36, 2, 6, ZPIdxX, ROL },
+		{ 0x2E, 3, 6, Absolu, ROL },
+		{ 0x3E, 3, 7, AbIdxX, ROL },
 
-		{ 0x6A, 1, 2, Accumu, "ROR A" },
-		{ 0x66, 2, 5, ZeroPg, "ROR "ADDR_8 },
-		{ 0x76, 2, 6, ZPIdxX, "ROR "ADDR_8",X" },
-		{ 0x6E, 3, 6, Absolu, "ROR "ADDR_16 },
-		{ 0x7E, 3, 7, AbIdxX, "ROR "ADDR_16",X" },
+		{ 0x6A, 1, 2, Accumu, ROR },
+		{ 0x66, 2, 5, ZeroPg, ROR },
+		{ 0x76, 2, 6, ZPIdxX, ROR },
+		{ 0x6E, 3, 6, Absolu, ROR },
+		{ 0x7E, 3, 7, AbIdxX, ROR },
 
-		{ 0x40, 1, 6, Implid, "RTI" },
+		{ 0x40, 1, 6, Implid, RTI },
 
-		{ 0x60, 1, 6, Implid, "RTS" },
+		{ 0x60, 1, 6, Implid, RTS },
 
-		{ 0xE9, 2, 2, Immedt, "SBC #"ADDR_8 },
-		{ 0xE5, 2, 3, ZeroPg, "SBC "ADDR_8 },
-		{ 0xF5, 2, 4, ZPIdxX, "SBC "ADDR_8",X" },
-		{ 0xED, 3, 4, Absolu, "SBC "ADDR_16 },
-		{ 0xFD, 3, 4, AbIdxX, "SBC "ADDR_16",X" },
-		{ 0xF9, 3, 4, AbIdxY, "SBC "ADDR_16",Y" },
-		{ 0xE1, 2, 6, IdxInd, "SBC ("ADDR_8",X)" },
-		{ 0xF1, 2, 5, IndIdx, "SBC ("ADDR_8"),Y" },
+		{ 0xE9, 2, 2, Immedt, SBC },
+		{ 0xE5, 2, 3, ZeroPg, SBC },
+		{ 0xF5, 2, 4, ZPIdxX, SBC },
+		{ 0xED, 3, 4, Absolu, SBC },
+		{ 0xFD, 3, 4, AbIdxX, SBC },
+		{ 0xF9, 3, 4, AbIdxY, SBC },
+		{ 0xE1, 2, 6, IdxInd, SBC },
+		{ 0xF1, 2, 5, IndIdx, SBC },
 
-		{ 0x38, 1, 2, Implid, "SEC" },
+		{ 0x38, 1, 2, Implid, SEC },
 
-		{ 0xF8, 1, 2, Implid, "SED" },
+		{ 0xF8, 1, 2, Implid, SED },
 
-		{ 0x78, 1, 2, Implid, "SEI" },
+		{ 0x78, 1, 2, Implid, SEI },
 
-		{ 0x85, 2, 3, ZeroPg, "STA "ADDR_8 },
-		{ 0x95, 2, 4, ZPIdxX, "STA "ADDR_8",X" },
-		{ 0x8D, 3, 4, Absolu, "STA "ADDR_16 },
-		{ 0x9D, 3, 5, AbIdxX, "STA "ADDR_16",X" },
-		{ 0x99, 3, 5, AbIdxY, "STA "ADDR_16",Y" },
-		{ 0x81, 2, 6, IdxInd, "STA ("ADDR_8",X)" },
-		{ 0x91, 2, 6, IndIdx, "STA ("ADDR_8"),Y" },
+		{ 0x85, 2, 3, ZeroPg, STA },
+		{ 0x95, 2, 4, ZPIdxX, STA },
+		{ 0x8D, 3, 4, Absolu, STA },
+		{ 0x9D, 3, 5, AbIdxX, STA },
+		{ 0x99, 3, 5, AbIdxY, STA },
+		{ 0x81, 2, 6, IdxInd, STA },
+		{ 0x91, 2, 6, IndIdx, STA },
 
-		{ 0x86, 2, 3, ZeroPg, "STX "ADDR_8 },
-		{ 0x96, 2, 4, ZPIdxY, "STX "ADDR_8",Y" },
-		{ 0x8E, 3, 4, Absolu, "STX "ADDR_16 },
+		{ 0x86, 2, 3, ZeroPg, STX },
+		{ 0x96, 2, 4, ZPIdxY, STX },
+		{ 0x8E, 3, 4, Absolu, STX },
 
-		{ 0x84, 2, 3, ZeroPg, "STY "ADDR_8 },
-		{ 0x94, 2, 4, ZPIdxX, "STY "ADDR_8",X" },
-		{ 0x8C, 3, 4, Absolu, "STY "ADDR_16 },
+		{ 0x84, 2, 3, ZeroPg, STY },
+		{ 0x94, 2, 4, ZPIdxX, STY },
+		{ 0x8C, 3, 4, Absolu, STY },
 
-		{ 0xAA, 1, 2, Implid, "TAX" },
+		{ 0xAA, 1, 2, Implid, TAX },
 
-		{ 0xA8, 1, 2, Implid, "TAY" },
+		{ 0xA8, 1, 2, Implid, TAY },
 
-		{ 0xBA, 1, 2, Implid, "TSX" },
+		{ 0xBA, 1, 2, Implid, TSX },
 
-		{ 0x8A, 1, 2, Implid, "TXA" },
+		{ 0x8A, 1, 2, Implid, TXA },
 
-		{ 0x9A, 1, 2, Implid, "TXS" },
+		{ 0x9A, 1, 2, Implid, TXS },
 
-		{ 0x98, 1, 2, Implid, "TYA" },
+		{ 0x98, 1, 2, Implid, TYA },
 	};
 
 	static OpCodeEntry* opCodeTableOrdered[256];
@@ -441,74 +484,57 @@ OpCodeEntry** GetOpCodeTable()
 
 void ValidateOpCodeTable(OpCodeEntry opCodeTable[], size_t numEntries)
 {
-	auto BeginsWith = [] (const std::string& in, const std::string& sub)
-	{
-		return in.find(sub) == 0;
-	};
-
-	auto EndsWith = [] (const std::string& in, const std::string& sub)
-	{
-		return in.rfind(sub) == in.size() - sub.size();
-	};
-
 	for (size_t i = 0; i < numEntries; ++i)
 	{
 		const OpCodeEntry& entry = opCodeTable[i];
 		switch (opCodeTable[i].addrMode)
 		{
-		case Immedt:
+		case AddressMode::Immedt:
 			assert(entry.numBytes == 2);
-			assert(entry.formatString[4] == '#');
 			break;
-		case Implid:
+		case AddressMode::Implid:
 			assert(entry.numBytes == 1);
-			assert(strlen(entry.formatString)==3);
 			break;
-		case Accumu:
+		case AddressMode::Accumu:
 			assert(entry.numBytes == 1);
-			assert(entry.formatString[4] == 'A' && "Expected Accumulator operand");
 			break;
-		case Relatv:
-			assert(entry.numBytes == 2);
-			assert(entry.formatString[0] == 'B' && "Expected Branch instruction");
-			break;
-		case ZeroPg:
+		case AddressMode::Relatv:
 			assert(entry.numBytes == 2);
 			break;
-		case ZPIdxX:
+		case AddressMode::ZeroPg:
 			assert(entry.numBytes == 2);
-			assert(EndsWith(entry.formatString, ",X"));
 			break;
-		case ZPIdxY:
+		case AddressMode::ZPIdxX:
 			assert(entry.numBytes == 2);
-			assert(EndsWith(entry.formatString, ",Y"));
 			break;
-		case Absolu:
+		case AddressMode::ZPIdxY:
+			assert(entry.numBytes == 2);
+			break;
+		case AddressMode::Absolu:
 			assert(entry.numBytes == 3);
 			break;
-		case AbIdxX:
+		case AddressMode::AbIdxX:
 			assert(entry.numBytes == 3);
-			assert(EndsWith(entry.formatString, ",X"));
 			break;
-		case AbIdxY:
+		case AddressMode::AbIdxY:
 			assert(entry.numBytes == 3);
-			assert(EndsWith(entry.formatString, ",Y"));
 			break;
-		case Indrct:
+		case AddressMode::Indrct:
 			assert(entry.numBytes == 3);
-			assert(BeginsWith(entry.formatString, "JMP (") && EndsWith(entry.formatString, ")"));
+			assert(entry.opCodeName == OpCodeName::JMP);
 			break;
-		case IdxInd:
+		case AddressMode::IdxInd:
 			assert(entry.numBytes == 2);
-			assert(entry.formatString[4] == '(' && EndsWith(entry.formatString, ",X)"));
 			break;
-		case IndIdx:
+		case AddressMode::IndIdx:
 			assert(entry.numBytes == 2);
-			assert(entry.formatString[4] == '(' && EndsWith(entry.formatString, "),Y"));
 			break;
 		}
 	}
 }
+
+#define ADDR_8 "$%02X"
+#define ADDR_16 "$%04X"
 
 void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 {
@@ -544,29 +570,30 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 		}
 		printf("\t");
 
-		// TEMP: if this works out, we'll store these in a table and the index in the opcode table
-		char opCodeName[4] = {0};
-		memcpy(opCodeName, pEntry->formatString, 3);
-
 		// Print opcode name
-		printf("%s ", opCodeName);
+		printf("%s ", OpCodeName::String[pEntry->opCodeName]);
 
 		// Print operand
 		switch (pEntry->addrMode)
 		{
-		case Immedt:
+		case AddressMode::Immedt:
 			{
 			const uint8 address = pPrgRom[PC+1];
 			printf("#"ADDR_8, address);
 			}
 			break;
 
-		case Implid:
-		case Accumu:
+		case AddressMode::Implid:
 			// No operand to output
 			break;
 
-		case Relatv:
+		case AddressMode::Accumu:
+			{
+			printf("A");
+			}
+			break;
+
+		case AddressMode::Relatv:
 			{
 			// For branch instructions, resolve the target address and print it in comments
 			const int8 offset = pPrgRom[PC+1]; // Signed offset in [-128,127]
@@ -575,63 +602,63 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 			}
 			break;
 		
-		case ZeroPg:
+		case AddressMode::ZeroPg:
 			{
 			const uint8 address = pPrgRom[PC+1];
 			printf(ADDR_8, address);
 			}
 			break;
 
-		case ZPIdxX:
+		case AddressMode::ZPIdxX:
 			{
 			const uint8 address = pPrgRom[PC+1];
 			printf(ADDR_8",X", address);
 			}
 			break;
 		
-		case ZPIdxY:
+		case AddressMode::ZPIdxY:
 			{
 			const uint8 address = pPrgRom[PC+1];
 			printf(ADDR_8",Y", address);
 			}
 			break;
 
-		case Absolu:
+		case AddressMode::Absolu:
 			{
 			uint16 address = (pPrgRom[PC+2]<<8) | (pPrgRom[PC+1]);
 			printf(ADDR_16, address);
 			}
 			break;
 
-		case AbIdxX:
+		case AddressMode::AbIdxX:
 			{
 			uint16 address = (pPrgRom[PC+2]<<8) | (pPrgRom[PC+1]);
 			printf(ADDR_16",X", address);
 			}
 			break;
 
-		case AbIdxY:
+		case AddressMode::AbIdxY:
 			{
 			uint16 address = (pPrgRom[PC+2]<<8) | (pPrgRom[PC+1]);
 			printf(ADDR_16",Y", address);
 			}
 			break;
 
-		case Indrct:
+		case AddressMode::Indrct:
 			{
 			uint16 address = (pPrgRom[PC+2]<<8) | (pPrgRom[PC+1]);
 			printf("("ADDR_16")", address);
 			}
 			break;
 
-		case IdxInd:
+		case AddressMode::IdxInd:
 			{
 			const uint8 address = pPrgRom[PC+1];
 			printf("("ADDR_8",X)", address);
 			}
 			break;
 
-		case IndIdx:
+		case AddressMode::IndIdx:
 			{
 			const uint8 address = pPrgRom[PC+1];
 			printf("("ADDR_8"),Y", address);
