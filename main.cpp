@@ -572,11 +572,6 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 			const int8 offset = pPrgRom[PC+1]; // Signed offset in [-128,127]
 			const uint16 target = startAddress + PC + pEntry->numBytes + offset;
 			printf(ADDR_8" ; "ADDR_16" (%d)", pPrgRom[PC+1], target, offset);
-			//const int8 operand = pPrgRom[PC+1];
-			//const int8 sign = (operand & 0x80)? -1 : 1;
-			//const int8 offset = (operand & 0x7F);
-			//const uint16 target = startAddress + PC + pEntry->numBytes + (sign * offset);
-			//printf(ADDR_8" ; "ADDR_16" (%c%d)", pPrgRom[PC+1], target, sign > 0? '+' : '-', offset);
 			}
 			break;
 		
@@ -651,92 +646,6 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 		printf("\n");
 		PC += pEntry->numBytes;
 	}
-
-	return;
-
-
-	//while (PC < prgRomSize)
-	//{
-	//	const uint8 opcode = pPrgRom[PC];
-	//	const OpCodeEntry* pEntry = ppOpCodeTable[opcode];
-
-	//	// Print PC
-	//	//printf("%08X:\t", PC);
-	//	printf(ADDR_16"\t", startAddress + PC);
-
-	//	
-	//	static OpCodeEntry UnknownOpCodeEntry = { 0x00, 1, 0, Immedt, ".byte "ADDR_8"\t; Invalid Opcode!" };
-	//	if (pEntry == nullptr)
-	//		pEntry = &UnknownOpCodeEntry;
-
-	//	// Print instruction in hex
-	//	for (int i = 0; i < pEntry->numBytes; ++i)
-	//		printf("%02X", pPrgRom[PC+i]);
-	//	for (int i = pEntry->numBytes; i < 3; ++i)
-	//		printf("  ");
-	//	printf("\t");
-
-	//	/*
-	//	if (!pEntry)
-	//	{
-	//		//static OpCodeEntry unknownOpCode = { 0x00, 2, 0, ".DB "ADDR_8 };
-	//		//pEntry = &unknownOpCode;
-
-	//		//printf("%02X\t.DB $%02X\n", pPrgRom[PC], pPrgRom[PC]);
-	//		printf("\t.byte "ADDR_8"\t; INVALID OPCODE !!!\n\n", pPrgRom[PC]);
-	//		PC += 1;
-	//		continue;
-	//	}
-	//	*/
-
-	//	// Print instruction in asm
-	//	const uint8 operandSize = pEntry->numBytes - 1;
-	//	switch (operandSize)
-	//	{
-	//	case 0:
-	//		{
-	//			//@HACKY: always pass current instruction so that InvalidOpCode will print it, will be ignored for all other opcodes
-	//			printf(pEntry->formatString, pPrgRom[PC]);
-	//		}
-	//		break;
-
-	//	case 1:
-	//		{
-	//			uint8 address = pPrgRom[PC+1];
-	//			printf(pEntry->formatString, address);
-	//			
-	//			// For relative (branch), resolve and print target address in comment
-	//			if (pEntry->addrMode == Relatv)
-	//			{
-	//				int8 offset = pPrgRom[PC+1]; // Signed offset [-128,127]
-	//				uint16 jmpAddress = startAddress + PC + pEntry->numBytes + offset;
-	//				printf("\t; "ADDR_16, jmpAddress);
-	//			}
-	//			//else
-	//			//{
-	//			//	uint8 address = pPrgRom[PC+1];
-	//			//	printf(pEntry->formatString, address);
-	//			//}
-	//		}
-	//		break;
-
-	//	case 2:
-	//		{
-	//			uint16 address = (pPrgRom[PC+2]<<8) | (pPrgRom[PC+1]);
-	//			printf(pEntry->formatString, address);
-	//		}
-	//		break;
-
-	//	default:
-	//		assert(false && "Invalid number of operands");
-	//		break;
-	//	}
-	//	//printf("\t;");
-	//
-	//	printf("\n");
-
-	//	PC += pEntry->numBytes;
-	//}
 }
 
 int ShowUsage(const char* appPath)
