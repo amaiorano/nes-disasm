@@ -2,6 +2,7 @@
 #include <memory>
 #include <cassert>
 #include <string>
+#include <cstdarg>
 
 typedef unsigned char uint8;
 typedef char int8;
@@ -22,6 +23,68 @@ static_assert(sizeof(int32)==4, "Invalid type size");
 #define ARRAYSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 
 template <typename N> struct CTPrintSize;
+
+template <int MaxLength = 1024>
+struct FormatString
+{
+	FormatString(const char* format, ...)
+	{
+		va_list args;
+		va_start(args, format);
+		vsnprintf(buffer, MaxLength, format, args);
+		va_end(args);
+	}
+
+	const char* Value() const { return buffer; }
+
+	operator const char*() const { return Value(); }
+
+	char buffer[MaxLength];
+};
+
+class FileStream
+{
+public:
+	FileStream() : m_pFile(nullptr)
+	{
+	}
+	
+	~FileStream()
+	{
+		Close();
+	}
+
+	FileStream(const char* name, const char* mode) : m_pFile(nullptr)
+	{
+		if (!Open(name, mode))
+			throw std::exception(FormatString<>("Failed to open file: %s", name));
+	}
+
+	bool Open(const char* name, const char* mode)
+	{
+		Close();
+		m_pFile = fopen(name, mode);
+		return m_pFile != nullptr;
+	}
+
+	void Close()
+	{
+		if (m_pFile)
+		{
+			fclose(m_pFile);
+			m_pFile = nullptr;
+		}
+	}
+
+	template <typename T>
+	bool Read(T* pDestBuffer, int count = 1)
+	{
+		return fread(pDestBuffer, sizeof(T), count, m_pFile) == (sizeof(T) * count);
+	}
+
+private:
+	FILE* m_pFile;
+};
 
 enum class ScreenArrangement
 {
@@ -110,50 +173,6 @@ struct RomHeader
 	}
 };
 static_assert(sizeof(RomHeader)==16, "RomHeader must be 16 bytes");
-
-class FileStream
-{
-public:
-	FileStream() : m_pFile(nullptr)
-	{
-	}
-	
-	~FileStream()
-	{
-		Close();
-	}
-
-	FileStream(const char* name, const char* mode) : m_pFile(nullptr)
-	{
-		if (!Open(name, mode))
-			throw std::exception("Failed to open file");
-	}
-
-	bool Open(const char* name, const char* mode)
-	{
-		Close();
-		m_pFile = fopen(name, mode);
-		return m_pFile != nullptr;
-	}
-
-	void Close()
-	{
-		if (m_pFile)
-		{
-			fclose(m_pFile);
-			m_pFile = nullptr;
-		}
-	}
-
-	template <typename T>
-	bool Read(T* pDestBuffer, int count = 1)
-	{
-		return fread(pDestBuffer, sizeof(T), count, m_pFile) == (sizeof(T) * count);
-	}
-
-private:
-	FILE* m_pFile;
-};
 
 enum eAddressMode
 {
@@ -720,29 +739,51 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 	//}
 }
 
+int ShowUsage(const char* appPath)
+{
+	printf("Usage: %s <nes rom>\n\n", appPath);
+	return -1;
+}
+
 int main(int argc, const char* argv[])
 {
-	FileStream fs("roms/Donkey Kong (JU).nes", "rb");
+	try
+	{
+		if (argc != 2)
+			throw std::exception("Missing argument(s)");
 
-	RomHeader header;
-	fs.Read((uint8*)&header, sizeof(RomHeader));
+		FileStream fs(argv[1], "rb");
 
-	if ( !header.IsValidHeader() )
-		throw std::exception("Invalid header");
+		RomHeader header;
+		fs.Read((uint8*)&header, sizeof(RomHeader));
 
-	// Next is Trainer, if present (0 or 512 bytes)
-	if ( header.HasTrainer() )
-		throw std::exception("Not supporting trainer roms");
+		if ( !header.IsValidHeader() )
+			throw std::exception("Invalid header");
 
-	if ( header.IsPlayChoice10() || header.IsVSUnisystem() )
-		throw std::exception("Not supporting arcade roms (Playchoice10 / VS Unisystem)");
+		// Next is Trainer, if present (0 or 512 bytes)
+		if ( header.HasTrainer() )
+			throw std::exception("Not supporting trainer roms");
 
-	// Next is PRG-ROM data (16384 * x bytes)
-	const size_t prgRomSize = header.GetPrgRomSizeBytes();
-	uint8* pPrgRom = new uint8[prgRomSize];
-	fs.Read(pPrgRom, prgRomSize);
-	Disassemble(pPrgRom, prgRomSize);
-	delete [] pPrgRom;
+		if ( header.IsPlayChoice10() || header.IsVSUnisystem() )
+			throw std::exception("Not supporting arcade roms (Playchoice10 / VS Unisystem)");
+
+		// Next is PRG-ROM data (16384 * x bytes)
+		const size_t prgRomSize = header.GetPrgRomSizeBytes();
+		uint8* pPrgRom = new uint8[prgRomSize];
+		fs.Read(pPrgRom, prgRomSize);
+		Disassemble(pPrgRom, prgRomSize);
+		delete [] pPrgRom;
+	}
+	catch (const std::exception& ex)
+	{
+		printf("%s\n", ex.what());
+		return ShowUsage(argv[0]);
+	}
+	catch (...)
+	{
+		printf("Unknown exception\n");
+		return ShowUsage(argv[0]);
+	}
 
 	return 0;
 }
