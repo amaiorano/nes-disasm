@@ -22,6 +22,7 @@ static_assert(sizeof(int32)==4, "Invalid type size");
 
 #define ARRAYSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 
+template <typename T> void ArrayDeleter(T* p) { delete [] p; }
 template <typename N> struct CTPrintSize;
 
 template <int MaxLength = 1024>
@@ -732,10 +733,10 @@ int main(int argc, const char* argv[])
 
 		// Next is PRG-ROM data (16384 * x bytes)
 		const size_t prgRomSize = header.GetPrgRomSizeBytes();
-		uint8* pPrgRom = new uint8[prgRomSize];
-		fs.Read(pPrgRom, prgRomSize);
-		Disassemble(pPrgRom, prgRomSize);
-		delete [] pPrgRom;
+		std::shared_ptr<uint8> pPrgRom(new uint8[prgRomSize], ArrayDeleter<uint8>);
+		fs.Read(pPrgRom.get(), prgRomSize);
+
+		Disassemble(pPrgRom.get(), prgRomSize);
 	}
 	catch (const std::exception& ex)
 	{
