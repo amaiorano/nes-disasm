@@ -1,8 +1,10 @@
 #include <cstdio>
 #include <memory>
 #include <cassert>
-#include <string>
 #include <cstdarg>
+#include <cstring>
+#include <string>
+#include <stdexcept>
 
 typedef unsigned char uint8;
 typedef char int8;
@@ -23,6 +25,7 @@ static_assert(sizeof(int32)==4, "Invalid type size");
 #define ARRAYSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 
 template <typename T> void ArrayDeleter(T* p) { delete [] p; }
+
 template <typename N> struct CTPrintSize;
 
 template <int MaxLength = 1024>
@@ -58,7 +61,7 @@ public:
 	FileStream(const char* name, const char* mode) : m_pFile(nullptr)
 	{
 		if (!Open(name, mode))
-			throw std::exception(FormattedString<>("Failed to open file: %s", name));
+			throw std::invalid_argument(FormattedString<>("Failed to open file: %s", name).Value());
 	}
 
 	bool Open(const char* name, const char* mode)
@@ -550,12 +553,12 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 		const OpCodeEntry* pEntry = ppOpCodeTable[opCode];
 
 		// Print PC
-		printf(ADDR_16"\t", startAddress + PC);
+		printf(ADDR_16 "\t", startAddress + PC);
 
 		if (pEntry == nullptr)
 		{
 			printf("%02X  \t", pPrgRom[PC+1]);
-			printf(".byte "ADDR_8"\n", opCode);
+			printf(".byte " ADDR_8 "\n", opCode);
 			PC += 1;
 			continue;
 		}
@@ -580,7 +583,7 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 		case AddressMode::Immedt:
 			{
 			const uint8 address = pPrgRom[PC+1];
-			printf("#"ADDR_8, address);
+			printf("#" ADDR_8, address);
 			}
 			break;
 
@@ -599,7 +602,7 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 			// For branch instructions, resolve the target address and print it in comments
 			const int8 offset = pPrgRom[PC+1]; // Signed offset in [-128,127]
 			const uint16 target = startAddress + PC + pEntry->numBytes + offset;
-			printf(ADDR_8" ; "ADDR_16" (%d)", pPrgRom[PC+1], target, offset);
+			printf(ADDR_8 " ; " ADDR_16 " (%d)", pPrgRom[PC+1], target, offset);
 			}
 			break;
 		
@@ -613,14 +616,14 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 		case AddressMode::ZPIdxX:
 			{
 			const uint8 address = pPrgRom[PC+1];
-			printf(ADDR_8",X", address);
+			printf(ADDR_8 ",X", address);
 			}
 			break;
 		
 		case AddressMode::ZPIdxY:
 			{
 			const uint8 address = pPrgRom[PC+1];
-			printf(ADDR_8",Y", address);
+			printf(ADDR_8 ",Y", address);
 			}
 			break;
 
@@ -634,35 +637,35 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 		case AddressMode::AbIdxX:
 			{
 			uint16 address = (pPrgRom[PC+2]<<8) | (pPrgRom[PC+1]);
-			printf(ADDR_16",X", address);
+			printf(ADDR_16 ",X", address);
 			}
 			break;
 
 		case AddressMode::AbIdxY:
 			{
 			uint16 address = (pPrgRom[PC+2]<<8) | (pPrgRom[PC+1]);
-			printf(ADDR_16",Y", address);
+			printf(ADDR_16 ",Y", address);
 			}
 			break;
 
 		case AddressMode::Indrct:
 			{
 			uint16 address = (pPrgRom[PC+2]<<8) | (pPrgRom[PC+1]);
-			printf("("ADDR_16")", address);
+			printf("(" ADDR_16 ")", address);
 			}
 			break;
 
 		case AddressMode::IdxInd:
 			{
 			const uint8 address = pPrgRom[PC+1];
-			printf("("ADDR_8",X)", address);
+			printf("(" ADDR_8 ",X)", address);
 			}
 			break;
 
 		case AddressMode::IndIdx:
 			{
 			const uint8 address = pPrgRom[PC+1];
-			printf("("ADDR_8"),Y", address);
+			printf("(" ADDR_8 "),Y", address);
 			}
 			break;
 
@@ -710,7 +713,7 @@ int main(int argc, const char* argv[])
 		PrintAppInfo();
 
 		if (argc != 2)
-			throw std::exception("Missing argument(s)");
+			throw std::invalid_argument("Missing argument(s)");
 
 		const char* inputFile = argv[1];
 
@@ -720,14 +723,14 @@ int main(int argc, const char* argv[])
 		fs.Read((uint8*)&header, sizeof(RomHeader));
 
 		if ( !header.IsValidHeader() )
-			throw std::exception("Invalid header");
+			throw std::invalid_argument("Invalid header");
 
 		// Next is Trainer, if present (0 or 512 bytes)
 		if ( header.HasTrainer() )
-			throw std::exception("Not supporting trainer roms");
+			throw std::invalid_argument("Not supporting trainer roms");
 
 		if ( header.IsPlayChoice10() || header.IsVSUnisystem() )
-			throw std::exception("Not supporting arcade roms (Playchoice10 / VS Unisystem)");
+			throw std::invalid_argument("Not supporting arcade roms (Playchoice10 / VS Unisystem)");
 
 		PrintRomInfo(inputFile, header);
 
