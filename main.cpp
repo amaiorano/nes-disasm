@@ -554,7 +554,7 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 		if (pEntry == nullptr)
 		{
 			printf("%02X  \t", pPrgRom[PC+1]);
-			printf(".byte "ADDR_8"; Invalid opcode\n", opCode);
+			printf(".byte "ADDR_8"\n", opCode);
 			PC += 1;
 			continue;
 		}
@@ -675,6 +675,27 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 	}
 }
 
+void PrintAppInfo()
+{
+	const char* text =
+		"; nes-disasm - Disassembler for NES roms\n"
+		"; Author: Antonio Maiorano (amaiorano at gmail dot com)\n"
+		"; Source code available at http://github.com/amaiorano/nes-disasm/\n"
+		"\n";
+
+	printf(text);
+}
+
+void PrintRomInfo(const char* inputFile, RomHeader& header)
+{
+	printf("; Input file: %s\n", inputFile);
+	printf("; PRG ROM size: %d bytes\n", header.GetPrgRomSizeBytes());
+	printf("; CHR ROM size: %d bytes\n", header.GetChrRomSizeBytes());
+	printf("; Mapper number: %d\n", header.GetMapperNumber());
+	printf("; Has SRAM: %s\n", header.HasSRAM()? "yes" : "no");
+	printf("\n");
+}
+
 int ShowUsage(const char* appPath)
 {
 	printf("Usage: %s <nes rom>\n\n", appPath);
@@ -685,10 +706,14 @@ int main(int argc, const char* argv[])
 {
 	try
 	{
+		PrintAppInfo();
+
 		if (argc != 2)
 			throw std::exception("Missing argument(s)");
 
-		FileStream fs(argv[1], "rb");
+		const char* inputFile = argv[1];
+
+		FileStream fs(inputFile, "rb");
 
 		RomHeader header;
 		fs.Read((uint8*)&header, sizeof(RomHeader));
@@ -702,6 +727,8 @@ int main(int argc, const char* argv[])
 
 		if ( header.IsPlayChoice10() || header.IsVSUnisystem() )
 			throw std::exception("Not supporting arcade roms (Playchoice10 / VS Unisystem)");
+
+		PrintRomInfo(inputFile, header);
 
 		// Next is PRG-ROM data (16384 * x bytes)
 		const size_t prgRomSize = header.GetPrgRomSizeBytes();
