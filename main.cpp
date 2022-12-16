@@ -686,23 +686,15 @@ void PrintAppInfo()
 		"; Author: Antonio Maiorano (amaiorano at gmail dot com)\n"
 		"; Source code available at http://github.com/amaiorano/nes-disasm/\n"
 		"\n";
-#ifdef _WIN32
-	printf(text);
-#else
+
 	printf("%s", text);
-#endif
 }
 
 void PrintRomInfo(const char* inputFile, RomHeader& header)
 {
 	printf("; Input file: %s\n", inputFile);
-#ifdef _WIN32 
-	printf("; PRG ROM size: %d bytes\n", header.GetPrgRomSizeBytes());
-	printf("; CHR ROM size: %d bytes\n", header.GetChrRomSizeBytes());
-#else
 	printf("; PRG ROM size: %ld bytes\n", header.GetPrgRomSizeBytes());
 	printf("; CHR ROM size: %ld bytes\n", header.GetChrRomSizeBytes());
-#endif
 	printf("; Mapper number: %d\n", header.GetMapperNumber());
 	printf("; Has SRAM: %s\n", header.HasSRAM()? "yes" : "no");
 	printf("\n");
