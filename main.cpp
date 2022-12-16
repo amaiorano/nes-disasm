@@ -553,7 +553,7 @@ void Disassemble(uint8* pPrgRom, size_t prgRomSize)
 		const OpCodeEntry* pEntry = ppOpCodeTable[opCode];
 
 		// Print PC
-		printf(ADDR_16 "\t", startAddress + PC);
+		printf(ADDR_16 "\t", startAddress + (unsigned int)PC);
 
 		if (pEntry == nullptr)
 		{
@@ -687,14 +687,14 @@ void PrintAppInfo()
 		"; Source code available at http://github.com/amaiorano/nes-disasm/\n"
 		"\n";
 
-	printf(text);
+	printf("%s", text);
 }
 
 void PrintRomInfo(const char* inputFile, RomHeader& header)
 {
 	printf("; Input file: %s\n", inputFile);
-	printf("; PRG ROM size: %d bytes\n", header.GetPrgRomSizeBytes());
-	printf("; CHR ROM size: %d bytes\n", header.GetChrRomSizeBytes());
+	printf("; PRG ROM size: %ld bytes\n", header.GetPrgRomSizeBytes());
+	printf("; CHR ROM size: %ld bytes\n", header.GetChrRomSizeBytes());
 	printf("; Mapper number: %d\n", header.GetMapperNumber());
 	printf("; Has SRAM: %s\n", header.HasSRAM()? "yes" : "no");
 	printf("\n");
